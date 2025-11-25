@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Excel to Bar Charts + AI Insights</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- SheetJS (for reading .xls/.xlsx) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <!-- Chart.js (for charts) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #020817;
+      color: #e5e7eb;
+      min-height: 100vh;
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      padding: 1rem 1.2rem;
+      border-radius: 1.25rem;
+      background: radial-gradient(circle at top left, rgba(79, 70, 229, 0.22), transparent),
+                  rgba(9, 9, 16, 0.98);
+      border: 1px solid rgba(129, 140, 248, 0.35);
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.8);
+    }
+
+    .logo {
+      font-weight: 700;
+      font-size: 1.1rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: #a5b4fc;
+    }
+
+    header p {
+      font-size: 0.9rem;
+      color: #9ca3af;
+      max-width: 460px;
+    }
+
+    .uploader {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 1rem;
+      padding: 1.1rem 1.2rem;
+      border-radius: 1.1rem;
+      background: rgba(9, 9, 16, 0.98);
+      border: 1px solid rgba(75, 85, 99, 0.9);
+    }
+
+    .uploader label {
+      font-size: 0.9rem;
+      color: #9ca3af;
+    }
+
+    input[type="file"] {
+      padding: 0.45rem;
+      font-size: 0.9rem;
+      color: #e5e7eb;
+      background: #020817;
+      border-radius: 0.6rem;
+      border: 1px solid rgba(75, 85, 99, 0.9);
+      cursor: pointer;
+      max-width: 260px;
+    }
+
+    .select-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      align-items: center;
+      padding: 1rem 1.2rem;
+      border-radius: 1.1rem;
+      background: rgba(9, 9, 16, 0.98);
+      border: 1px solid rgba(55, 65, 81, 0.98);
+      font-size: 0.85rem;
+      color: #9ca3af;
+    }
+
+    select {
+      padding: 0.4rem 0.6rem;
+      border-radius: 0.5rem;
+      border: 1px solid rgba(75, 85, 99, 0.9);
+      background: #020817;
+      color: #e5e7eb;
+      font-size: 0.85rem;
+      min-width: 140px;
+      cursor: pointer;
+    }
+
+    button {
+      padding: 0.55rem 1.4rem;
+      border-radius: 999px;
+      border: none;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      background: linear-gradient(to right, #4f46e5, #818cf8);
+      color: #f9fafb;
+      box-shadow: 0 12px 30px rgba(79, 70, 229, 0.5);
+      transition: all 0.16s ease;
+      white-space: nowrap;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 18px 40px rgba(79, 70, 229, 0.6);
+      opacity: 0.97;
+    }
+
+    button.secondary {
+      background: transparent;
+      color: #9ca3af;
+      box-shadow: none;
+      border: 1px solid rgba(75, 85, 99, 0.9);
+    }
+
+    button.secondary:hover {
+      color: #e5e7eb;
+      box-shadow: 0 8px 20px rgba(15, 23, 42, 0.9);
+    }
+
+    .status {
+      font-size: 0.8rem;
+      color: #9ca3af;
+    }
+
+    .charts-container {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+
+    .chart-wrapper {
+      margin-top: 0.5rem;
+      padding: 1.2rem 1.2rem 1.6rem;
+      border-radius: 1.3rem;
+      background: rgba(9, 9, 16, 0.98);
+      border: 1px solid rgba(31, 41, 55, 0.98);
+      box-shadow: 0 22px 50px rgba(15, 23, 42, 0.9);
+      height: 400px;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    .chart-title {
+      font-size: 0.95rem;
+      color: #c7d2fe;
+    }
+
+    .chart-subtitle {
+      font-size: 0.75rem;
+      color: #6b7280;
+    }
+
+    .chart-wrapper canvas {
+      flex: 1;
+    }
+
+    .ai-wrapper {
+      margin-top: 0.5rem;
+      padding: 1.1rem 1.2rem 1.3rem;
+      border-radius: 1.3rem;
+      background: rgba(6, 8, 16, 0.98);
+      border: 1px solid rgba(75, 85, 99, 0.9);
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.8);
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+      font-size: 0.85rem;
+    }
+
+    .ai-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #c7d2fe;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.2rem 0.6rem;
+      border-radius: 999px;
+      border: 1px solid rgba(129, 140, 248, 0.4);
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: #a5b4fc;
+      gap: 0.25rem;
+    }
+
+    .ai-output-title {
+      font-weight: 600;
+      margin-top: 0.35rem;
+      margin-bottom: 0.1rem;
+      color: #e5e7eb;
+    }
+
+    .ai-text {
+      color: #9ca3af;
+      line-height: 1.6;
+      white-space: pre-wrap;
+    }
+
+    .ai-list {
+      margin-left: 1rem;
+      margin-top: 0.15rem;
+    }
+
+    .ai-list li {
+      margin-bottom: 0.15rem;
+    }
+
+    footer {
+      margin-top: auto;
+      text-align: center;
+      font-size: 0.75rem;
+      color: #6b7280;
+    }
+
+    @media (max-width: 720px) {
+      body {
+        padding: 1.5rem;
+      }
+      header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">XLS → Bar Charts + AI</div>
+    <p>Upload an Excel file, visualize it, and get AI-generated summaries & suggestions based on your data.</p>
+  </header>
+
+  <section class="uploader">
+    <div>
+      <label for="file-input">Select Excel file (.xls / .xlsx)</label><br />
+      <input id="file-input" type="file" accept=".xls,.xlsx" />
+    </div>
+    <div class="status" id="file-status">No file loaded yet.</div>
+  </section>
+
+  <section class="select-row">
+    <div>
+      <strong>Label column (X-axis):</strong><br />
+      <select id="label-column">
+        <option value="">-- choose after upload --</option>
+      </select>
+    </div>
+    <div>
+      <strong>Value column (Y-axis):</strong><br />
+      <select id="value-column">
+        <option value="">-- choose after upload --</option>
+      </select>
+    </div>
+    <div>
+      <button id="generate-btn" disabled>Generate Bar Chart(s)</button>
+      <button id="reset-btn" class="secondary">Reset</button>
+      <div class="status" id="info-text">Tip: First row should contain column names.</div>
+    </div>
+  </section>
+
+  <section class="charts-container">
+    <div class="chart-wrapper">
+      <div class="chart-title">Primary Bar Chart</div>
+      <div class="chart-subtitle" id="primary-caption">Select columns and generate to view.</div>
+      <canvas id="chartCanvas"></canvas>
+    </div>
+
+    <div class="chart-wrapper">
+      <div class="chart-title">Secondary Bar Chart (auto)</div>
+      <div class="chart-subtitle" id="secondary-caption">
+        If another numeric column is found, it will be charted here using the same labels.
+      </div>
+      <canvas id="chartCanvas2"></canvas>
+    </div>
+  </section>
+
+  <section class="ai-wrapper">
+    <div class="pill">AI Insights</div>
+    <div class="ai-title">Summary & Suggestions</div>
+    <div class="status" id="ai-status">
+      After generating charts, click the button below to get an AI summary of trends and actionable suggestions.
+    </div>
+    <div>
+      <button id="ai-btn">Generate AI Insights</button>
+    </div>
+    <div class="ai-output">
+      <div class="ai-output-title">Summary</div>
+      <div id="ai-summary" class="ai-text">No summary yet.</div>
+
+      <div class="ai-output-title">Suggestions</div>
+      <ul id="ai-suggestions" class="ai-text ai-list">
+        <li>No suggestions yet.</li>
+      </ul>
+    </div>
+  </section>
+
+  <footer>
+    Built in your GitHub Codespace. Backend /api/summarize required for AI.
+  </footer>
+
+  <script>
+    let workbookData = null;
+    let currentChart = null;
+    let secondaryChart = null;
+
+    const fileInput = document.getElementById("file-input");
+    const fileStatus = document.getElementById("file-status");
+    const labelSelect = document.getElementById("label-column");
+    const valueSelect = document.getElementById("value-column");
+    const generateBtn = document.getElementById("generate-btn");
+    const resetBtn = document.getElementById("reset-btn");
+    const infoText = document.getElementById("info-text");
+    const primaryCaption = document.getElementById("primary-caption");
+    const secondaryCaption = document.getElementById("secondary-caption");
+    const aiBtn = document.getElementById("ai-btn");
+    const aiStatus = document.getElementById("ai-status");
+    const aiSummary = document.getElementById("ai-summary");
+    const aiSuggestions = document.getElementById("ai-suggestions");
+
+    fileInput.addEventListener("change", handleFileSelection);
+    generateBtn.addEventListener("click", handleGenerateChart);
+    resetBtn.addEventListener("click", resetAll);
+    aiBtn.addEventListener("click", generateInsights);
+
+    function handleFileSelection(event) {
+      const file = event.target.files[0];
+      if (!file) {
+        fileStatus.textContent = "No file selected.";
+        workbookData = null;
+        resetSelects();
+        generateBtn.disabled = true;
+        return;
+      }
+
+      fileStatus.textContent = `Loading "${file.name}"...`;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const wb = XLSX.read(data, { type: "array" });
+
+          const firstSheetName = wb.SheetNames[0];
+          const sheet = wb.Sheets[firstSheetName];
+          const json = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+          if (!json.length) {
+            throw new Error("The sheet appears to be empty.");
+          }
+
+          const headers = json[0].map((h, i) =>
+            h === null || h === undefined || h === "" ? `Column ${i + 1}` : String(h)
+          );
+
+          workbookData = {
+            headers,
+            rows: json.slice(1)
+          };
+
+          populateSelects(headers);
+          fileStatus.textContent = `Loaded sheet "${firstSheetName}" with ${workbookData.rows.length} rows.`;
+          infoText.textContent = "Choose label and value columns, then click Generate.";
+          generateBtn.disabled = false;
+        } catch (err) {
+          console.error(err);
+          fileStatus.textContent = "Error reading file. Make sure it's a valid .xls/.xlsx.";
+          workbookData = null;
+          resetSelects();
+          generateBtn.disabled = true;
+        }
+      };
+      reader.onerror = function() {
+        fileStatus.textContent = "Error reading file.";
+        workbookData = null;
+        resetSelects();
+        generateBtn.disabled = true;
+      };
+
+      reader.readAsArrayBuffer(file);
+    }
+
+    function populateSelects(headers) {
+      resetSelects();
+      headers.forEach((header, index) => {
+        const opt1 = document.createElement("option");
+        opt1.value = index;
+        opt1.textContent = header;
+        labelSelect.appendChild(opt1);
+
+        const opt2 = document.createElement("option");
+        opt2.value = index;
+        opt2.textContent = header;
+        valueSelect.appendChild(opt2);
+      });
+    }
+
+    function resetSelects() {
+      labelSelect.innerHTML = '<option value="">-- choose after upload --</option>';
+      valueSelect.innerHTML = '<option value="">-- choose after upload --</option>';
+    }
+
+    function handleGenerateChart() {
+      if (!workbookData) {
+        infoText.textContent = "Upload a file first.";
+        return;
+      }
+
+      const labelIndex = parseInt(labelSelect.value, 10);
+      const valueIndex = parseInt(valueSelect.value, 10);
+
+      if (Number.isNaN(labelIndex) || Number.isNaN(valueIndex)) {
+        infoText.textContent = "Please choose both label and value columns.";
+        return;
+      }
+
+      const secondaryIndex = findSecondaryNumericColumn(valueIndex);
+
+      const labels = [];
+      const values = [];
+      const secondaryValues = [];
+
+      workbookData.rows.forEach(row => {
+        const label = row[labelIndex];
+        const rawValue = row[valueIndex];
+
+        if (label !== undefined && label !== null && label !== "") {
+          const numericValue = Number(rawValue);
+          if (!Number.isNaN(numericValue)) {
+            labels.push(String(label));
+            values.push(numericValue);
+
+            if (secondaryIndex !== -1) {
+              const secRaw = row[secondaryIndex];
+              const secNum = Number(secRaw);
+              secondaryValues.push(!Number.isNaN(secNum) ? secNum : null);
+            }
+          }
+        }
+      });
+
+      if (!labels.length) {
+        infoText.textContent = "No valid numeric data found for the chosen columns.";
+        return;
+      }
+
+      renderBarChart("chartCanvas", labels, values, workbookData.headers[valueIndex] || "Value", true);
+      primaryCaption.textContent = `Showing ${labels.length} data points for "${workbookData.headers[valueIndex]}".`;
+      infoText.textContent = `Showing ${labels.length} data points.`;
+
+      if (secondaryIndex !== -1 && secondaryValues.some(v => v !== null)) {
+        renderBarChart(
+          "chartCanvas2",
+          labels,
+          secondaryValues,
+          workbookData.headers[secondaryIndex],
+          false
+        );
+        secondaryCaption.textContent =
+          `Auto-charted "${workbookData.headers[secondaryIndex]}" using the same labels.`;
+      } else {
+        clearChart("chartCanvas2", false);
+        secondaryCaption.textContent =
+          "No suitable second numeric column found. Add one to your sheet to see a second chart.";
+      }
+
+      // Clear previous AI outputs on new chart
+      aiSummary.textContent = "No summary yet.";
+      aiSuggestions.innerHTML = "<li>No suggestions yet.</li>";
+      aiStatus.textContent =
+        "Charts updated. Click 'Generate AI Insights' to analyze these values.";
+    }
+
+    function findSecondaryNumericColumn(excludeIndex) {
+      if (!workbookData) return -1;
+
+      for (let idx = 0; idx < workbookData.headers.length; idx++) {
+        if (idx === excludeIndex) continue;
+
+        const hasNumeric = workbookData.rows.some(row => {
+          const v = Number(row[idx]);
+          return !Number.isNaN(v);
+        });
+
+        if (hasNumeric) return idx;
+      }
+      return -1;
+    }
+
+    function renderBarChart(canvasId, labels, data, valueLabel, isPrimary) {
+      const oldCanvas = document.getElementById(canvasId);
+      const newCanvas = oldCanvas.cloneNode(false);
+      oldCanvas.parentNode.replaceChild(newCanvas, oldCanvas);
+
+      const ctx = newCanvas.getContext("2d");
+
+      if (isPrimary) {
+        if (currentChart) currentChart.destroy();
+      } else {
+        if (secondaryChart) secondaryChart.destroy();
+      }
+
+      const chart = new Chart(ctx, {
+        type: "bar",
+        data: {
+          labels,
+          datasets: [
+            {
+              label: valueLabel,
+              data,
+              backgroundColor: "rgba(129, 140, 248, 0.6)",
+              borderColor: "rgba(129, 140, 248, 1)",
+              borderWidth: 1.2,
+              borderRadius: 6
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: {
+              ticks: { color: "#9ca3af" },
+              grid: { display: false }
+            },
+            y: {
+              ticks: { color: "#9ca3af" },
+              grid: { color: "rgba(75, 85, 99, 0.4)" },
+              beginAtZero: true
+            }
+          },
+          plugins: {
+            legend: {
+              labels: { color: "#e5e7eb" }
+            },
+            tooltip: {
+              backgroundColor: "rgba(15,23,42,0.96)",
+              titleColor: "#e5e7eb",
+              bodyColor: "#9ca3af",
+              borderColor: "rgba(75,85,99,0.9)",
+              borderWidth: 1
+            }
+          }
+        }
+      });
+
+      if (isPrimary) {
+        currentChart = chart;
+      } else {
+        secondaryChart = chart;
+      }
+    }
+
+    function clearChart(canvasId, isPrimary) {
+      const oldCanvas = document.getElementById(canvasId);
+      const newCanvas = oldCanvas.cloneNode(false);
+      oldCanvas.parentNode.replaceChild(newCanvas, oldCanvas);
+
+      if (isPrimary && currentChart) {
+        currentChart.destroy();
+        currentChart = null;
+      }
+      if (!isPrimary && secondaryChart) {
+        secondaryChart.destroy();
+        secondaryChart = null;
+      }
+    }
+
+    function resetAll() {
+      fileInput.value = "";
+      workbookData = null;
+      fileStatus.textContent = "No file loaded yet.";
+      infoText.textContent = "Tip: First row should contain column names.";
+      resetSelects();
+      generateBtn.disabled = true;
+
+      clearChart("chartCanvas", true);
+      clearChart("chartCanvas2", false);
+
+      primaryCaption.textContent = "Select columns and generate to view.";
+      secondaryCaption.textContent =
+        "If another numeric column is found, it will be charted here using the same labels.";
+
+      aiSummary.textContent = "No summary yet.";
+      aiSuggestions.innerHTML = "<li>No suggestions yet.</li>";
+      aiStatus.textContent =
+        "After generating charts, click the button to get AI insights.";
+    }
+
+    async function generateInsights() {
+      if (!workbookData || !currentChart) {
+        aiStatus.textContent = "Generate at least one chart before asking for AI insights.";
+        return;
+      }
+
+      const labelIndex = parseInt(labelSelect.value, 10);
+      const valueIndex = parseInt(valueSelect.value, 10);
+
+      if (Number.isNaN(labelIndex) || Number.isNaN(valueIndex)) {
+        aiStatus.textContent = "Please choose label and value columns first.";
+        return;
+      }
+
+      // Build a compact preview of the data for the backend
+      const points = [];
+      workbookData.rows.forEach(row => {
+        const label = row[labelIndex];
+        const rawValue = row[valueIndex];
+        const numericValue = Number(rawValue);
+        if (
+          label !== undefined &&
+          label !== null &&
+          label !== "" &&
+          !Number.isNaN(numericValue)
+        ) {
+          points.push({ label: String(label), value: numericValue });
+        }
+      });
+
+      const preview = points.slice(0, 50); // cap to keep payload small
+
+      if (!preview.length) {
+        aiStatus.textContent = "No valid numeric data to summarize.";
+        return;
+      }
+
+      aiStatus.textContent = "Contacting AI backend (/api/summarize)...";
+      aiSummary.textContent = "";
+      aiSuggestions.innerHTML = "";
+
+      try {
+        const res = await fetch("/api/summarize", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            xColumn: workbookData.headers[labelIndex],
+            yColumn: workbookData.headers[valueIndex],
+            points: preview
+          })
+        });
+
+        if (!res.ok) {
+          throw new Error("Non-OK response");
+        }
+
+        const data = await res.json();
+        const summary = data.summary || "No summary returned.";
+        const suggestions = Array.isArray(data.suggestions)
+          ? data.suggestions
+          : [];
+
+        aiSummary.textContent = summary;
+
+        if (suggestions.length) {
+          aiSuggestions.innerHTML = "";
+          suggestions.forEach(s => {
+            const li = document.createElement("li");
+            li.textContent = s;
+            aiSuggestions.appendChild(li);
+          });
+        } else {
+          aiSuggestions.innerHTML = "<li>No suggestions returned.</li>";
+        }
+
+        aiStatus.textContent = "AI insights updated.";
+      } catch (err) {
+        console.error(err);
+        aiStatus.textContent =
+          "Could not reach /api/summarize. Make sure your backend is running and configured.";
+        if (!aiSummary.textContent) {
+          aiSummary.textContent =
+            "Set up a backend endpoint at /api/summarize that calls your LLM and returns JSON.";
+        }
+        if (!aiSuggestions.innerHTML.trim()) {
+          aiSuggestions.innerHTML =
+            "<li>Example: host a small API that calls an OpenAI model with this data.</li>";
+        }
+      }
+    }
+  </script>
+</body>
+</html>
